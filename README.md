@@ -7,9 +7,9 @@ FocusMode is a lightweight, high-performance utility for Windows that helps you 
 Unlike traditional "game boosters" that forcefully kill background processes (risking data loss) or suspend them (causing Windows Explorer crashes), FocusMode uses a highly stable, non-destructive engine:
 
 - **Memory Flushing:** Forces background apps to flush their working set (RAM) to the page file via `EmptyWorkingSet`, instantly freeing up gigabytes of physical memory.
-- **CPU Throttling:** Lowers the CPU priority of background apps to `Idle`, ensuring they use exactly 0% CPU while your focused app is demanding resources.
+- **Single UI Thread Survival:** Instead of using dangerous full-process suspension (`NtSuspendProcess`) which causes the Windows Taskbar to crash, or killing processes which causes data loss, FocusMode uses a surgical thread-level suspension. It freezes all worker threads in the background app to guarantee 0% CPU, but intelligently keeps exactly one UI thread alive so it can still communicate with Windows Explorer.
 - **Visual Ghosting:** Hides distracting windows from your screen and taskbar without actually terminating the applications.
-- **Seamless Restoration:** When you're done, FocusMode restores all windows, memory access, and CPU priorities exactly as they were. No unsaved work is ever lost.
+- **Seamless Restoration:** When you're done, FocusMode restores all windows, memory access, and worker threads exactly as they were. No unsaved work is ever lost.
 
 ## Features
 

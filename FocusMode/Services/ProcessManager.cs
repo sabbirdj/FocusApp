@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Management;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using FocusMode.Models;
 
 namespace FocusMode.Services;
@@ -332,13 +333,32 @@ public class ProcessManager
                     {
                         FileName = processData.ExePath,
                         Arguments = processData.Arguments ?? "",
-                        UseShellExecute = true,
+                        UseShellExecute = false,
                         WorkingDirectory = Path.GetDirectoryName(processData.ExePath),
-                        WindowStyle = ProcessWindowStyle.Minimized,
+                        WindowStyle = ProcessWindowStyle.Hidden,
                         CreateNoWindow = true
                     };
 
                     Process.Start(startInfo);
+
+                    // Aggressively hide the window if the app ignores the Hidden startup hint
+                    string pName = processData.Name;
+                    Task.Run(async () =>
+                    {
+                        await Task.Delay(2500);
+                        try
+                        {
+                            var procs = Process.GetProcessesByName(pName);
+                            foreach (var p in procs)
+                            {
+                                if (p.MainWindowHandle != IntPtr.Zero)
+                                {
+                                    ShowWindow(p.MainWindowHandle, SW_HIDE);
+                                }
+                            }
+                        }
+                        catch { }
+                    });
                 }
                 
                 result.RestoredCount++;

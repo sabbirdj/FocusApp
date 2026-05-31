@@ -178,7 +178,7 @@ public class ProcessManager
         var safePids = GetSafePids(focusAppNames);
         long actualRamFreed = 0;
 
-        var processesToFreeze = new List<(Process proc, List<long> handles, ProcessInfo appGroup, SuspendedProcessBackup? backupObj)>();
+        var processesToFreeze = new List<(Process proc, List<long> handles, ProcessInfo appGroup, SuspendedProcessBackup? backupObj, bool isOldest)>();
 
         foreach (var appGroup in toSuspend)
         {
@@ -189,6 +189,18 @@ public class ProcessManager
             BackupProcessData(appGroup, session);
             
             var backupObj = session.SuspendedProcesses.FirstOrDefault(b => b.Name == appGroup.Name);
+
+            // Find oldest PID to act as the primary tray/UI responder
+            int oldestPid = -1;
+            DateTime oldestTime = DateTime.MaxValue;
+            foreach (var pid in pidsToSuspend)
+            {
+                try
+                {
+                    using var p = Process.GetProcessById(pid);
+                    if (p.StartTime < oldestTime) { oldestTime = p.StartTime; oldestPid = pid; }
+                } catch { }
+            }
 
             foreach (var pid in pidsToSuspend)
             {
@@ -221,7 +233,7 @@ public class ProcessManager
                         }, IntPtr.Zero);
                     }
 
-                    processesToFreeze.Add((proc, handles, appGroup, backupObj));
+                    processesToFreeze.Add((proc, handles, appGroup, backupObj, pid == oldestPid));
                 }
                 catch { }
             }
@@ -239,21 +251,24 @@ public class ProcessManager
             try
             {
                 uint uiThreadId = 0;
-                try 
+                if (item.isOldest) 
                 {
-                    if (item.proc.MainWindowHandle != IntPtr.Zero)
+                    try 
                     {
-                        uiThreadId = GetWindowThreadProcessId(item.proc.MainWindowHandle, out _);
-                    }
-                } 
-                catch { }
+                        if (item.proc.MainWindowHandle != IntPtr.Zero)
+                        {
+                            uiThreadId = GetWindowThreadProcessId(item.proc.MainWindowHandle, out _);
+                        }
+                    } 
+                    catch { }
+                }
 
                 var suspendedThisProc = new List<int>();
 
                 foreach (ProcessThread pt in item.proc.Threads)
                 {
                     // Fallback to find a UI thread if MainWindowHandle was missing
-                    if (uiThreadId == 0)
+                    if (item.isOldest && uiThreadId == 0)
                     {
                         EnumThreadWindows(pt.Id, (hWnd, lParam) =>
                         {

@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="FocusMode.Pages.FocusActivePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:converters="using:FocusMode.Converters"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisConverter" />
+        <converters:BytesToDisplayConverter x:Key="BytesConverter" />
+
+        <!-- Pulsing ring opacity animation -->
+        <Storyboard x:Name="PulseStoryboard" RepeatBehavior="Forever" AutoReverse="True">
+            <DoubleAnimation
+                Storyboard.TargetName="PulseRing"
+                Storyboard.TargetProperty="Opacity"
+                From="0.4"
+                To="1.0"
+                Duration="0:0:1.8">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+
+        <!-- Pulsing ring scale animation -->
+        <Storyboard x:Name="ScaleStoryboard" RepeatBehavior="Forever" AutoReverse="True">
+            <DoubleAnimation
+                Storyboard.TargetName="RingScaleTransform"
+                Storyboard.TargetProperty="ScaleX"
+                From="0.95"
+                To="1.05"
+                Duration="0:0:1.8">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation
+                Storyboard.TargetName="RingScaleTransform"
+                Storyboard.TargetProperty="ScaleY"
+                From="0.95"
+                To="1.05"
+                Duration="0:0:1.8">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+    </Page.Resources>
+
+    <Grid Padding="32,24,32,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Main centered content -->
+        <StackPanel Grid.Row="0"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Spacing="32">
+
+            <!-- Animated pulsing ring with timer -->
+            <Grid HorizontalAlignment="Center" Width="240" Height="240">
+                <Border x:Name="PulseRing"
+                        Width="240"
+                        Height="240"
+                        CornerRadius="120"
+                        BorderThickness="5"
+                        BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                        Background="Transparent"
+                        Opacity="0.7"
+                        RenderTransformOrigin="0.5,0.5">
+                    <Border.RenderTransform>
+                        <ScaleTransform x:Name="RingScaleTransform" ScaleX="1" ScaleY="1" />
+                    </Border.RenderTransform>
+                </Border>
+
+                <!-- Inner content: timer + status text -->
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
+                    <TextBlock x:Name="TimerText"
+                               Text="00:00:00"
+                               FontSize="40"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"
+                               Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                    <TextBlock Text="FOCUS MODE ON"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                               CharacterSpacing="80" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Stats grid -->
+            <Grid HorizontalAlignment="Center" ColumnSpacing="24" RowSpacing="24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Suspended count stat -->
+                <Border Grid.Row="0" Grid.Column="0"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="20,16"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        MinWidth="200">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Processes hibernated"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="18" Height="18" VerticalAlignment="Center"><Path Data="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75" Fill="{ThemeResource AccentFillColorDefaultBrush}" Stretch="Uniform" /></Viewbox>
+                            <TextBlock x:Name="SuspendedCountText"
+                                       Text="0"
+                                       FontSize="24" FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- RAM freed stat -->
+                <Border Grid.Row="0" Grid.Column="1"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="20,16"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        MinWidth="200">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="RAM Freed"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="18" Height="18" VerticalAlignment="Center"><Path Data="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z M2 10h20 M2 14h20 M6 6v12 M10 6v12 M14 6v12 M18 6v12" Fill="{ThemeResource AccentFillColorDefaultBrush}" Stretch="Uniform" /></Viewbox>
+                            <TextBlock x:Name="RamFreedText"
+                                       Text="0 KB"
+                                       FontSize="24" FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Remaining Process count stat -->
+                <Border Grid.Row="1" Grid.Column="0"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="20,16"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        MinWidth="200">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Active Processes"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="18" Height="18" VerticalAlignment="Center"><Path Data="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75" Fill="{ThemeResource TextFillColorSecondaryBrush}" Stretch="Uniform" /></Viewbox>
+                            <TextBlock Text="{Binding RemainingProcessCount}"
+                                       FontSize="24" FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Remaining RAM used stat -->
+                <Border Grid.Row="1" Grid.Column="1"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8"
+                        Padding="20,16"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        MinWidth="200">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Active RAM Used"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="18" Height="18" VerticalAlignment="Center"><Path Data="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z M2 10h20 M2 14h20 M6 6v12 M10 6v12 M14 6v12 M18 6v12" Fill="{ThemeResource TextFillColorSecondaryBrush}" Stretch="Uniform" /></Viewbox>
+                            <TextBlock Text="{Binding FormattedRemainingRam}"
+                                       FontSize="24" FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Focus apps horizontal list -->
+            <StackPanel HorizontalAlignment="Center" Spacing="8">
+                <TextBlock Text="Focus Apps"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           HorizontalAlignment="Center" />
+                <ItemsRepeater x:Name="FocusAppsList">
+                    <ItemsRepeater.Layout>
+                        <StackLayout Orientation="Horizontal" Spacing="8" />
+                    </ItemsRepeater.Layout>
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{ThemeResource SurfaceBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="12,6">
+                                <TextBlock Text="{Binding}"
+                                           FontSize="13"
+                                           FontWeight="Medium"
+                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                           VerticalAlignment="Center" />
+                            </Border>
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
+            </StackPanel>
+
+            <Button x:Name="EndFocusButton"
+                    HorizontalAlignment="Center"
+                    MinWidth="220"
+                    Height="44"
+                    CornerRadius="6"
+                    Click="EndFocusButton_Click">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Background" Value="#ef4444" />
+                        <Setter Property="Foreground" Value="#fafafa" />
+                        <Setter Property="FontSize" Value="14" />
+                        <Setter Property="FontWeight" Value="Medium" />
+                    </Style>
+                </Button.Style>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Viewbox Width="14" Height="14"><Path Data="M18 6L6 18 M6 6l12 12" Fill="#fafafa" Stretch="Uniform" /></Viewbox>
+                    <TextBlock Text="END FOCUS MODE" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
+
+        <!-- Failed processes InfoBar at bottom -->
+        <InfoBar x:Name="FailedBar"
+                 Grid.Row="1"
+                 Title="Warning"
+                 Severity="Warning"
+                 IsOpen="False"
+                 IsClosable="True"
+                 Message="0 processes could not be suspended"
+                 Margin="0,16,0,0" />
+    </Grid>
+</Page>
+

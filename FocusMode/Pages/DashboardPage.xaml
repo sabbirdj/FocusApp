@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="FocusMode.Pages.DashboardPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:FocusMode.Converters"
+    Loaded="Page_Loaded">
+
+    <Page.Resources>
+        <converters:BytesToDisplayConverter x:Key="BytesConverter" />
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisConverter" />
+    </Page.Resources>
+
+    <Grid Background="Transparent" Padding="32,16,32,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />  <!-- Stats -->
+            <RowDefinition Height="Auto" />  <!-- Search + Scan -->
+            <RowDefinition Height="*" />     <!-- Process lists -->
+            <RowDefinition Height="Auto" />  <!-- Activate button -->
+        </Grid.RowDefinitions>
+
+        <!-- Stats Cards Row -->
+        <Grid Grid.Row="0" ColumnSpacing="16" Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- RAM Card -->
+            <Border Grid.Column="0" Style="{StaticResource GlassCard}">
+                <StackPanel>
+                    <TextBlock Text="RAM USAGE" Style="{StaticResource StatLabel}" />
+                    <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,6,0,0">
+                        <TextBlock x:Name="RamUsedText" Text="0" Style="{StaticResource StatValue}" />
+                        <TextBlock Text="GB" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" 
+                                   VerticalAlignment="Bottom" Margin="0,0,0,4" />
+                    </StackPanel>
+                    <ProgressBar x:Name="RamProgressBar" Value="0" Maximum="100" Height="4" 
+                                 Margin="0,8,0,0" CornerRadius="2"
+                                 Foreground="{StaticResource AccentBrush}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Process Count Card -->
+            <Border Grid.Column="1" Style="{StaticResource GlassCard}">
+                <StackPanel>
+                    <TextBlock Text="PROCESSES" Style="{StaticResource StatLabel}" />
+                    <TextBlock x:Name="ProcessCountText" Text="0" Style="{StaticResource StatValue}" Margin="0,6,0,0" />
+                    <TextBlock Text="running" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Selected Apps Card -->
+            <Border Grid.Column="2" Style="{StaticResource GlassCard}">
+                <StackPanel>
+                    <TextBlock Text="FOCUS APPS" Style="{StaticResource StatLabel}" />
+                    <TextBlock x:Name="SelectedCountText" Text="0" Style="{StaticResource StatValue}" Margin="0,6,0,0" />
+                    <TextBlock Text="selected to keep" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Search + Scan Row -->
+        <Grid Grid.Row="1" ColumnSpacing="12" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="SearchBox" PlaceholderText="🔍 Search processes..." 
+                     TextChanged="SearchBox_TextChanged"
+                     CornerRadius="8" Height="40"
+                     Background="{StaticResource CardBackgroundBrush}"
+                     BorderBrush="{StaticResource CardBorderBrush}" />
+
+            <Button Grid.Column="1" Style="{StaticResource ScanButton}" 
+                    Click="ScanButton_Click" MinWidth="120">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Viewbox Width="14" Height="14"><Path Data="M21 21l-6-6 M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" Fill="{ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" /></Viewbox>
+                    <TextBlock Text="Scan" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!-- Process Lists -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="16">
+
+                <!-- Pre-scan placeholder -->
+                <StackPanel x:Name="PreScanPlaceholder" HorizontalAlignment="Center" 
+                            VerticalAlignment="Center" Spacing="12" Margin="0,60,0,0">
+                    <PathIcon Data="M21 21l-6-6 M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" Width="40" Height="40" Foreground="{StaticResource TextSecondaryBrush}" 
+                              HorizontalAlignment="Center" />
+                    <TextBlock Text="Click Scan to discover all running processes" 
+                               Foreground="{StaticResource TextSecondaryBrush}" FontSize="16"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="Select the apps you want to KEEP, everything else will be hibernated" 
+                               Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
+                               HorizontalAlignment="Center" Opacity="0.7" />
+                </StackPanel>
+
+                <!-- Running Apps Section -->
+                <StackPanel x:Name="WindowedSection" Visibility="Collapsed" Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Viewbox Width="16" Height="16" VerticalAlignment="Center"><Path Data="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z M2 10h20 M2 14h20" Fill="{StaticResource TextPrimaryBrush}" Stretch="Uniform" /></Viewbox>
+                        <TextBlock Style="{StaticResource SectionHeader}" VerticalAlignment="Center">
+                            <Run Text="Running Apps" />
+                            <Run x:Name="WindowedCountRun" Text="" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" />
+                        </TextBlock>
+                    </StackPanel>
+                    <ListView x:Name="WindowedListView" SelectionMode="None" 
+                              MaxHeight="300">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="4,8" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox Grid.Column="0" 
+                                              IsChecked="{Binding IsSelected, Mode=TwoWay}" 
+                                              Checked="ProcessCheckBox_Changed"
+                                              Unchecked="ProcessCheckBox_Changed"
+                                              VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding DisplayName}" 
+                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                   TextTrimming="CharacterEllipsis" MaxWidth="400" />
+                                        <TextBlock Text="{Binding Name}" FontSize="11" 
+                                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding FormattedMemory}" 
+                                               VerticalAlignment="Center" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+
+                <!-- Background Processes Section -->
+                <StackPanel x:Name="BackgroundSection" Visibility="Collapsed" Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Viewbox Width="16" Height="16" VerticalAlignment="Center"><Path Data="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" Fill="{StaticResource TextPrimaryBrush}" Stretch="Uniform" /></Viewbox>
+                        <TextBlock Style="{StaticResource SectionHeader}" VerticalAlignment="Center">
+                            <Run Text="Background Processes" />
+                            <Run x:Name="BackgroundCountRun" Text="" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" />
+                        </TextBlock>
+                    </StackPanel>
+                    <ListView x:Name="BackgroundListView" SelectionMode="None"
+                              MaxHeight="300">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="4,8" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox Grid.Column="0" 
+                                              IsChecked="{Binding IsSelected, Mode=TwoWay}" 
+                                              Checked="ProcessCheckBox_Changed"
+                                              Unchecked="ProcessCheckBox_Changed"
+                                              VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" 
+                                                   Foreground="{StaticResource TextPrimaryBrush}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding FormattedMemory}" 
+                                               VerticalAlignment="Center" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Button x:Name="ActivateButton" Grid.Row="3" 
+                Style="{StaticResource PrimaryButton}"
+                HorizontalAlignment="Stretch" Height="52" Margin="0,16,0,0"
+                Click="ActivateButton_Click" IsEnabled="False">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Viewbox Width="16" Height="16"><Path Data="M13 2L3 14h9l-1 8 10-12h-9l1-8z" Fill="#18181b" Stretch="Uniform" /></Viewbox>
+                <TextBlock Text="ACTIVATE FOCUS" VerticalAlignment="Center" FontSize="15" FontWeight="Bold" />
+            </StackPanel>
+        </Button>
+    </Grid>
+</Page>
+

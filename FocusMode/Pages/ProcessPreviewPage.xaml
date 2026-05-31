@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="FocusMode.Pages.ProcessPreviewPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:converters="using:FocusMode.Converters"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <converters:BytesToDisplayConverter x:Key="BytesConverter" />
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisConverter" />
+    </Page.Resources>
+
+    <Grid Padding="32,24,32,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Spacing="8" Margin="0,0,0,16">
+            <TextBlock Text="Review Processes to Hibernate"
+                       Style="{StaticResource TitleTextBlockStyle}" />
+
+            <Grid ColumnSpacing="24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Process count -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">
+                    <Viewbox Width="14" Height="14" VerticalAlignment="Center"><Path Data="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75" Fill="{ThemeResource TextFillColorSecondaryBrush}" Stretch="Uniform" /></Viewbox>
+                    <TextBlock x:Name="HeaderText"
+                               Text="0 processes will be hibernated"
+                               Style="{StaticResource BodyTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- RAM to free -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                    <Viewbox Width="14" Height="14" VerticalAlignment="Center"><Path Data="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z M2 10h20 M2 14h20 M6 6v12 M10 6v12 M14 6v12 M18 6v12" Fill="{ThemeResource TextFillColorSecondaryBrush}" Stretch="Uniform" /></Viewbox>
+                    <TextBlock x:Name="RamText"
+                               Text="0 KB RAM will be freed"
+                               Style="{StaticResource BodyTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+
+        <!-- Process list -->
+        <ListView x:Name="ProcessListView"
+                  Grid.Row="1"
+                  SelectionMode="None"
+                  BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                  BorderThickness="1"
+                  CornerRadius="8"
+                  Margin="0,0,0,16">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Padding="8,10" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Process icon -->
+                        <Viewbox Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center"><Path Data="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75" Fill="{ThemeResource TextFillColorSecondaryBrush}" Stretch="Uniform" /></Viewbox>
+
+                        <!-- Process name -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding DisplayName}"
+                                       Style="{StaticResource BodyStrongTextBlockStyle}"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxWidth="320" />
+                            <TextBlock Text="{Binding Name}"
+                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+
+                        <!-- RAM usage -->
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding FormattedMemory}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Style="{StaticResource BodyTextBlockStyle}" />
+
+                        <!-- Exclude checkbox -->
+                        <CheckBox Grid.Column="3"
+                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                  Checked="ExcludeCheckBox_Changed"
+                                  Unchecked="ExcludeCheckBox_Changed"
+                                  VerticalAlignment="Center"
+                                  ToolTipService.ToolTip="Include in Hibernate list" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- Footer buttons -->
+        <Grid Grid.Row="2" ColumnSpacing="12" HorizontalAlignment="Right">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Button x:Name="CancelButton"
+                    Grid.Column="0"
+                    Content="Cancel"
+                    MinWidth="120"
+                    Height="40"
+                    CornerRadius="6"
+                    Style="{StaticResource GhostButton}"
+                    Click="CancelButton_Click" />
+
+            <Button x:Name="ProceedButton"
+                    Grid.Column="1"
+                    MinWidth="160"
+                    Height="40"
+                    CornerRadius="6"
+                    Click="ProceedButton_Click">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+                        <Setter Property="FontWeight" Value="SemiBold" />
+                    </Style>
+                </Button.Style>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Viewbox Width="14" Height="14"><Path Data="M5 3l14 9-14 9V3z" Fill="{ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" /></Viewbox>
+                    <TextBlock Text="Hibernate Selected" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </Grid>
+    </Grid>
+</Page>
+

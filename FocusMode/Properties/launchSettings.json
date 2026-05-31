@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "FocusMode (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "FocusMode (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

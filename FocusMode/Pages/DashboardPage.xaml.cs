@@ -73,11 +73,11 @@ public sealed partial class DashboardPage : Page
         _viewModel.ScanProcessesCommand.Execute(null);
     }
 
-    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    private void SearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
     {
-        if (_viewModel != null && sender is TextBox tb)
+        if (_viewModel != null)
         {
-            _viewModel.SearchText = tb.Text;
+            _viewModel.SearchText = sender.Text;
         }
     }
 

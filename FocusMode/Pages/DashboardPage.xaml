@@ -68,11 +68,11 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <TextBox x:Name="SearchBox" PlaceholderText="🔍 Search processes..." 
-                     TextChanged="SearchBox_TextChanged"
-                     CornerRadius="8" Height="40"
-                     Background="{StaticResource CardBackgroundBrush}"
-                     BorderBrush="{StaticResource CardBorderBrush}" />
+            <AutoSuggestBox x:Name="SearchBox" PlaceholderText="Search processes..." QueryIcon="Find"
+                            TextChanged="SearchBox_TextChanged"
+                            CornerRadius="8" Height="40"
+                            Background="{StaticResource CardBackgroundBrush}"
+                            BorderBrush="{StaticResource CardBorderBrush}" />
 
             <Button Grid.Column="1" Style="{StaticResource ScanButton}" 
                     Click="ScanButton_Click" MinWidth="120">

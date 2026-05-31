@@ -191,7 +191,12 @@ public partial class App : Application
                     {
                         var focusApps = new System.Collections.Generic.List<string> { app.Name };
                         var killable = processManager.GetHibernateableProcesses(focusApps);
-                        processManager.ActivateFocusMode(killable, focusApps);
+                        var session = processManager.ActivateFocusMode(killable, focusApps);
+                        
+                        var nav = Services.GetRequiredService<NavigationService>();
+                        nav.NavigateTo(typeof(Pages.FocusActivePage), session);
+                        
+                        ShowWindow();
                     })
                 };
                 startItem.Items.Add(appItem);

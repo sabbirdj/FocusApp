@@ -319,6 +319,9 @@ public class ProcessManager
                     Process.Start(new ProcessStartInfo("netsh", $"advfirewall firewall add rule name=\"{ruleName}\" dir=in action=block program=\"{exePath}\" enable=yes profile=any") { CreateNoWindow = true, UseShellExecute = false })?.WaitForExit();
                 }
             } catch { }
+
+            // Mute all audio from this app group using WASAPI
+            AudioMuter.SetMuteByPids(item.appGroup.AllPids, true);
                 
                 session.SuspendedCount++;
                 if (item.backupObj != null)
@@ -350,11 +353,19 @@ public class ProcessManager
     public ResumeResult DeactivateFocusMode(FocusSession session)
     {
         var result = new ResumeResult();
+        var pidsToUnmute = new List<int>();
 
         foreach (var processData in session.SuspendedProcesses)
         {
             try
             {
+                // Collect PIDs to unmute
+                var procs = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(processData.ExePath));
+                foreach (var p in procs)
+                {
+                    pidsToUnmute.Add(p.Id);
+                }
+
                 bool atLeastOneResumed = false;
 
                 // 1. Try to resume the suspended PIDs
@@ -397,6 +408,9 @@ public class ProcessManager
                 result.FailedProcessNames.Add(processData.Name);
             }
         }
+
+        // Unmute all restored apps
+        AudioMuter.SetMuteByPids(pidsToUnmute, false);
 
         // Clean up the session file
         _sessionPersistenceService.ClearSession();

@@ -27,6 +27,12 @@ public class SuspendedProcessBackup
     public List<long> HiddenWindowHandles { get; set; } = new();
 
     /// <summary>
+    /// The thread IDs that were explicitly suspended.
+    /// </summary>
+    [JsonPropertyName("suspendedThreadIds")]
+    public List<int> SuspendedThreadIds { get; set; } = new();
+
+    /// <summary>
     /// Full path to the executable file.
     /// Used as fallback to re-launch if the suspended PID is lost.
     /// </summary>

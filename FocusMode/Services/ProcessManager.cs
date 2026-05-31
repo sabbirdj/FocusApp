@@ -333,7 +333,9 @@ public class ProcessManager
                         FileName = processData.ExePath,
                         Arguments = processData.Arguments ?? "",
                         UseShellExecute = true,
-                        WorkingDirectory = Path.GetDirectoryName(processData.ExePath)
+                        WorkingDirectory = Path.GetDirectoryName(processData.ExePath),
+                        WindowStyle = ProcessWindowStyle.Minimized,
+                        CreateNoWindow = true
                     };
 
                     Process.Start(startInfo);

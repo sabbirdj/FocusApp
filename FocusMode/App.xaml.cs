@@ -164,8 +164,9 @@ public partial class App : Application
                 Icon = new FontIcon { Glyph = "\uE71A" },
                 Command = new RelayCommand(() => 
                 {
-                    var session = sessionService.LoadSession();
-                    if (session != null) processManager.DeactivateFocusMode(session);
+                    var vm = Services.GetRequiredService<FocusActiveViewModel>();
+                    vm.EndFocusModeCommand.Execute(null);
+                    ShowWindow(); // Bring app to foreground
                 })
             };
             contextMenu.Items.Add(stopItem);

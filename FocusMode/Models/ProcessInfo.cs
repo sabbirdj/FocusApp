@@ -33,6 +33,11 @@ public partial class ProcessInfo : ObservableObject
     public string DisplayName { get; set; } = string.Empty;
 
     /// <summary>
+    /// Indicates whether the process has an active visible window.
+    /// </summary>
+    public bool IsWindowed { get; set; }
+
+    /// <summary>
     /// The aggregated working set memory size in bytes across all PIDs in this group.
     /// </summary>
     public long WorkingSetBytes { get; set; }

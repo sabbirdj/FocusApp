@@ -230,13 +230,48 @@ public class ProcessManager
             System.Threading.Thread.Sleep(250);
         }
 
-        // Now "ghost" them safely using full suspension
+        // Now "ghost" them safely by suspending all worker threads but keeping 1 UI thread alive
         foreach (var item in processesToFreeze)
         {
             try
             {
-                // Fully suspend the process to guarantee 0% CPU and zero background activity
-                try { NtSuspendProcess(item.proc.Handle); } catch { }
+                uint uiThreadId = 0;
+                try 
+                {
+                    if (item.proc.MainWindowHandle != IntPtr.Zero)
+                    {
+                        uiThreadId = GetWindowThreadProcessId(item.proc.MainWindowHandle, out _);
+                    }
+                } 
+                catch { }
+
+                var suspendedThisProc = new List<int>();
+
+                foreach (ProcessThread pt in item.proc.Threads)
+                {
+                    // Fallback to find a UI thread if MainWindowHandle was missing
+                    if (uiThreadId == 0)
+                    {
+                        EnumThreadWindows(pt.Id, (hWnd, lParam) =>
+                        {
+                            uiThreadId = (uint)pt.Id;
+                            return false; // Found one, stop enumerating
+                        }, IntPtr.Zero);
+                    }
+
+                    // Leave EXACTLY ONE UI thread alive to answer Explorer / Tray Icon messages
+                    // This prevents the Windows Taskbar from hanging!
+                    if (uiThreadId != 0 && pt.Id == uiThreadId)
+                        continue;
+
+                    IntPtr hThread = OpenThread(ThreadAccess.SUSPEND_RESUME, false, (uint)pt.Id);
+                    if (hThread != IntPtr.Zero)
+                    {
+                        SuspendThread(hThread);
+                        CloseHandle(hThread);
+                        suspendedThisProc.Add(pt.Id);
+                    }
+                }
                 
                 // Flush its RAM to disk
                 try { EmptyWorkingSet(item.proc.Handle); } catch { }
@@ -245,6 +280,7 @@ public class ProcessManager
                 if (item.backupObj != null)
                 {
                     item.backupObj.HiddenWindowHandles.AddRange(item.handles);
+                    item.backupObj.SuspendedThreadIds.AddRange(suspendedThisProc);
                 }
                 actualRamFreed += item.appGroup.WorkingSetBytes / item.appGroup.AllPids.Count;
             }
@@ -279,7 +315,7 @@ public class ProcessManager
                 // 1. Try to resume the suspended PIDs
                 foreach (var pid in processData.Pids)
                 {
-                    if (ResumeProcessByPid(pid, processData.HiddenWindowHandles))
+                    if (ResumeProcessByPid(pid, processData.HiddenWindowHandles, processData.SuspendedThreadIds))
                     {
                         atLeastOneResumed = true;
                     }
@@ -389,19 +425,48 @@ public class ProcessManager
 
 
 
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    private enum ThreadAccess : int
+    {
+        SUSPEND_RESUME = 0x0002
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern IntPtr OpenThread(ThreadAccess dwDesiredAccess, bool bInheritHandle, uint dwThreadId);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern uint SuspendThread(IntPtr hThread);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern uint ResumeThread(IntPtr hThread);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr hObject);
+
     private const int SW_HIDE = 0;
     private const int SW_SHOWNOACTIVATE = 4; // Displays a window in its most recent size and position, without activating it.
 
     // SuspendProcessByPid was refactored directly into ActivateFocusMode for safety
 
-    private bool ResumeProcessByPid(int pid, List<long> hiddenHandles)
+    private bool ResumeProcessByPid(int pid, List<long> hiddenHandles, List<int> suspendedThreadIds)
     {
         try
         {
             using var proc = Process.GetProcessById(pid);
             
-            // Resume fully suspended process
-            try { NtResumeProcess(proc.Handle); } catch { }
+            // Resume suspended threads
+            foreach (var threadId in suspendedThreadIds)
+            {
+                IntPtr hThread = OpenThread(ThreadAccess.SUSPEND_RESUME, false, (uint)threadId);
+                if (hThread != IntPtr.Zero)
+                {
+                    ResumeThread(hThread);
+                    CloseHandle(hThread);
+                }
+            }
 
             // Restore specifically only the windows we explicitly hid,
             // without stealing focus (SW_SHOWNOACTIVATE)

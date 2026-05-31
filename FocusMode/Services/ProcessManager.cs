@@ -230,31 +230,13 @@ public class ProcessManager
             System.Threading.Thread.Sleep(250);
         }
 
-        // Now "ghost" them safely using selective thread suspension
+        // Now "ghost" them safely using full suspension
         foreach (var item in processesToFreeze)
         {
             try
             {
-                // Suspend all NON-GUI threads so the app stops using CPU,
-                // but its UI thread stays alive to answer Explorer tray icon messages.
-                var suspendedThisProc = new List<int>();
-                foreach (ProcessThread pt in item.proc.Threads)
-                {
-                    GUITHREADINFO guiInfo = new GUITHREADINFO();
-                    guiInfo.cbSize = Marshal.SizeOf(guiInfo);
-                    bool isGui = GetGUIThreadInfo((uint)pt.Id, ref guiInfo);
-                    
-                    if (!isGui)
-                    {
-                        IntPtr hThread = OpenThread(ThreadAccess.SUSPEND_RESUME, false, (uint)pt.Id);
-                        if (hThread != IntPtr.Zero)
-                        {
-                            SuspendThread(hThread);
-                            CloseHandle(hThread);
-                            suspendedThisProc.Add(pt.Id);
-                        }
-                    }
-                }
+                // Fully suspend the process to guarantee 0% CPU and zero background activity
+                try { NtSuspendProcess(item.proc.Handle); } catch { }
                 
                 // Flush its RAM to disk
                 try { EmptyWorkingSet(item.proc.Handle); } catch { }
@@ -263,7 +245,6 @@ public class ProcessManager
                 if (item.backupObj != null)
                 {
                     item.backupObj.HiddenWindowHandles.AddRange(item.handles);
-                    item.backupObj.SuspendedThreadIds.AddRange(suspendedThisProc);
                 }
                 actualRamFreed += item.appGroup.WorkingSetBytes / item.appGroup.AllPids.Count;
             }
@@ -298,7 +279,7 @@ public class ProcessManager
                 // 1. Try to resume the suspended PIDs
                 foreach (var pid in processData.Pids)
                 {
-                    if (ResumeProcessByPid(pid, processData.HiddenWindowHandles, processData.SuspendedThreadIds))
+                    if (ResumeProcessByPid(pid, processData.HiddenWindowHandles))
                     {
                         atLeastOneResumed = true;
                     }
@@ -406,63 +387,21 @@ public class ProcessManager
     [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    public struct GUITHREADINFO
-    {
-        public int cbSize;
-        public int flags;
-        public IntPtr hwndActive;
-        public IntPtr hwndFocus;
-        public IntPtr hwndCapture;
-        public IntPtr hwndMenuOwner;
-        public IntPtr hwndMoveSize;
-        public IntPtr hwndCaret;
-        public System.Drawing.Rectangle rcCaret; // or just dummy struct, since we don't read it
-    }
 
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-    private static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
-
-    private enum ThreadAccess : int
-    {
-        SUSPEND_RESUME = 0x0002
-    }
-
-    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
-    private static extern IntPtr OpenThread(ThreadAccess dwDesiredAccess, bool bInheritHandle, uint dwThreadId);
-
-    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
-    private static extern uint SuspendThread(IntPtr hThread);
-
-    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
-    private static extern uint ResumeThread(IntPtr hThread);
-
-    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
-    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-    private static extern bool CloseHandle(IntPtr hObject);
 
     private const int SW_HIDE = 0;
     private const int SW_SHOWNOACTIVATE = 4; // Displays a window in its most recent size and position, without activating it.
 
     // SuspendProcessByPid was refactored directly into ActivateFocusMode for safety
 
-    private bool ResumeProcessByPid(int pid, List<long> hiddenHandles, List<int> suspendedThreadIds)
+    private bool ResumeProcessByPid(int pid, List<long> hiddenHandles)
     {
         try
         {
             using var proc = Process.GetProcessById(pid);
             
-            // Resume suspended threads
-            foreach (var threadId in suspendedThreadIds)
-            {
-                IntPtr hThread = OpenThread(ThreadAccess.SUSPEND_RESUME, false, (uint)threadId);
-                if (hThread != IntPtr.Zero)
-                {
-                    ResumeThread(hThread);
-                    CloseHandle(hThread);
-                }
-            }
+            // Resume fully suspended process
+            try { NtResumeProcess(proc.Handle); } catch { }
 
             // Restore specifically only the windows we explicitly hid,
             // without stealing focus (SW_SHOWNOACTIVATE)

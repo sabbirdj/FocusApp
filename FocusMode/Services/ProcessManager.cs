@@ -17,6 +17,7 @@ public class ProcessManager
 {
     private readonly WhitelistService _whitelistService;
     private readonly SessionPersistenceService _sessionPersistenceService;
+    private readonly TaskbarAntiHangMonitor _antiHangMonitor = new();
 
     public ProcessManager(
         WhitelistService whitelistService,
@@ -245,113 +246,76 @@ public class ProcessManager
             System.Threading.Thread.Sleep(250);
         }
 
-        // Now "ghost" them safely by suspending all worker threads but keeping 1 UI thread alive
+        var suspendedPids = new List<int>();
+
+        // Now fully suspend them using NtSuspendProcess
         foreach (var item in processesToFreeze)
         {
             try
             {
-                uint uiThreadId = 0;
-                if (item.isOldest) 
-                {
-                    try 
-                    {
-                        if (item.proc.MainWindowHandle != IntPtr.Zero)
-                        {
-                            uiThreadId = GetWindowThreadProcessId(item.proc.MainWindowHandle, out _);
-                        }
-                    } 
-                    catch { }
-                }
-
+                // Fully suspend the process! No exceptions!
+                NtSuspendProcess(item.proc.Handle);
+                suspendedPids.Add(item.proc.Id);
+                
                 var suspendedThisProc = new List<int>();
 
-                foreach (ProcessThread pt in item.proc.Threads)
+                // Call NtResumeProcess in case it was fully suspended previously, just to be safe
+                try { NtResumeProcess(item.proc.Handle); } catch { }
+
+                // Throttle entire process CPU usage to IDLE
+                try { item.proc.PriorityClass = ProcessPriorityClass.Idle; } catch { }
+
+                try { EmptyWorkingSet(item.proc.Handle); } catch { }
+                
+                // Block network access via Windows Firewall
+                try
                 {
-                    // Fallback to find a UI thread if MainWindowHandle was missing
-                    if (item.isOldest && uiThreadId == 0)
+                    string exePath = item.proc.MainModule?.FileName ?? "";
+                    if (!string.IsNullOrWhiteSpace(exePath))
                     {
-                        EnumThreadWindows(pt.Id, (hWnd, lParam) =>
-                        {
-                            uiThreadId = (uint)pt.Id;
-                            return false; // Found one, stop enumerating
-                        }, IntPtr.Zero);
+                        string ruleName = $"FocusMode_Block_{Path.GetFileName(exePath)}";
+                        Process.Start(new ProcessStartInfo("netsh", $"advfirewall firewall add rule name=\"{ruleName}\" dir=out action=block program=\"{exePath}\" enable=yes profile=any") { CreateNoWindow = true, UseShellExecute = false })?.WaitForExit();
+                        Process.Start(new ProcessStartInfo("netsh", $"advfirewall firewall add rule name=\"{ruleName}\" dir=in action=block program=\"{exePath}\" enable=yes profile=any") { CreateNoWindow = true, UseShellExecute = false })?.WaitForExit();
+                    }
+                } catch { }
+
+                // Mute all audio from this app group using WASAPI
+                AudioMuter.SetMuteByPids(item.appGroup.AllPids, true);
+                    
+                    session.SuspendedCount++;
+                    if (item.backupObj != null)
+                    {
+                        item.backupObj.HiddenWindowHandles.AddRange(item.handles);
+                        item.backupObj.SuspendedThreadIds.AddRange(suspendedThisProc);
                     }
 
-                // Leave EXACTLY ONE UI thread alive to answer Explorer / Tray Icon messages
-                // This prevents the Windows Taskbar from hanging!
-                if (uiThreadId != 0 && pt.Id == uiThreadId)
-                {
-                    // Throttle the surviving UI thread so it barely uses CPU
-                    try 
-                    {
-                        IntPtr hUIThread = OpenThread(ThreadAccess.SUSPEND_RESUME | (ThreadAccess)0x0020, false, (uint)pt.Id); // 0x0020 is SET_INFORMATION
-                        // Not strictly necessary as we set Process Priority to Idle below, but it helps.
-                        CloseHandle(hUIThread);
-                    } catch { }
-                    continue;
+                    actualRamFreed += item.appGroup.WorkingSetBytes / item.appGroup.AllPids.Count;
                 }
-
-                IntPtr hThread = OpenThread(ThreadAccess.SUSPEND_RESUME, false, (uint)pt.Id);
-                if (hThread != IntPtr.Zero)
+                catch { }
+                finally
                 {
-                    SuspendThread(hThread);
-                    CloseHandle(hThread);
-                    suspendedThisProc.Add(pt.Id);
+                    item.proc.Dispose();
                 }
             }
 
-            // Call NtResumeProcess in case it was fully suspended previously, just to be safe
-            try { NtResumeProcess(item.proc.Handle); } catch { }
+            session.RamFreedBytes = actualRamFreed;
 
-            // Throttle entire process CPU usage to IDLE
-            try { item.proc.PriorityClass = ProcessPriorityClass.Idle; } catch { }
+            // Save session to disk for crash recovery / auto-resume
+            _sessionPersistenceService.SaveSession(session);
 
-            try { EmptyWorkingSet(item.proc.Handle); } catch { }
-            
-            // Block network access via Windows Firewall
-            try
-            {
-                string exePath = item.proc.MainModule?.FileName ?? "";
-                if (!string.IsNullOrWhiteSpace(exePath))
-                {
-                    string ruleName = $"FocusMode_Block_{Path.GetFileName(exePath)}";
-                    Process.Start(new ProcessStartInfo("netsh", $"advfirewall firewall add rule name=\"{ruleName}\" dir=out action=block program=\"{exePath}\" enable=yes profile=any") { CreateNoWindow = true, UseShellExecute = false })?.WaitForExit();
-                    Process.Start(new ProcessStartInfo("netsh", $"advfirewall firewall add rule name=\"{ruleName}\" dir=in action=block program=\"{exePath}\" enable=yes profile=any") { CreateNoWindow = true, UseShellExecute = false })?.WaitForExit();
-                }
-            } catch { }
+            // Start monitoring Explorer for hangs
+            _antiHangMonitor.Start(() => suspendedPids);
 
-            // Mute all audio from this app group using WASAPI
-            AudioMuter.SetMuteByPids(item.appGroup.AllPids, true);
-                
-                session.SuspendedCount++;
-                if (item.backupObj != null)
-                {
-                    item.backupObj.HiddenWindowHandles.AddRange(item.handles);
-                    item.backupObj.SuspendedThreadIds.AddRange(suspendedThisProc);
-                }
-
-                actualRamFreed += item.appGroup.WorkingSetBytes / item.appGroup.AllPids.Count;
-            }
-            catch { }
-            finally
-            {
-                item.proc.Dispose();
-            }
+            return session;
         }
-
-        session.RamFreedBytes = actualRamFreed;
-
-        // Save session to disk for crash recovery / auto-resume
-        _sessionPersistenceService.SaveSession(session);
-
-        return session;
-    }
 
     /// <summary>
     /// Deactivates focus mode and wakes up all suspended applications.
     /// </summary>
     public ResumeResult DeactivateFocusMode(FocusSession session)
     {
+        _antiHangMonitor.Stop();
+        
         var result = new ResumeResult();
         var pidsToUnmute = new List<int>();
 
@@ -649,4 +613,3 @@ public class ProcessManager
         return safePids;
     }
 }
-

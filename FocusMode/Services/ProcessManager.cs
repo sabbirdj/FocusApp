@@ -262,24 +262,48 @@ public class ProcessManager
                         }, IntPtr.Zero);
                     }
 
-                    // Leave EXACTLY ONE UI thread alive to answer Explorer / Tray Icon messages
-                    // This prevents the Windows Taskbar from hanging!
-                    if (uiThreadId != 0 && pt.Id == uiThreadId)
-                        continue;
-
-                    IntPtr hThread = OpenThread(ThreadAccess.SUSPEND_RESUME, false, (uint)pt.Id);
-                    if (hThread != IntPtr.Zero)
+                // Leave EXACTLY ONE UI thread alive to answer Explorer / Tray Icon messages
+                // This prevents the Windows Taskbar from hanging!
+                if (uiThreadId != 0 && pt.Id == uiThreadId)
+                {
+                    // Throttle the surviving UI thread so it barely uses CPU
+                    try 
                     {
-                        SuspendThread(hThread);
-                        CloseHandle(hThread);
-                        suspendedThisProc.Add(pt.Id);
-                    }
+                        IntPtr hUIThread = OpenThread(ThreadAccess.SUSPEND_RESUME | (ThreadAccess)0x0020, false, (uint)pt.Id); // 0x0020 is SET_INFORMATION
+                        // Not strictly necessary as we set Process Priority to Idle below, but it helps.
+                        CloseHandle(hUIThread);
+                    } catch { }
+                    continue;
                 }
 
-                // Call NtResumeProcess in case it was fully suspended previously, just to be safe
-                try { NtResumeProcess(item.proc.Handle); } catch { }
+                IntPtr hThread = OpenThread(ThreadAccess.SUSPEND_RESUME, false, (uint)pt.Id);
+                if (hThread != IntPtr.Zero)
+                {
+                    SuspendThread(hThread);
+                    CloseHandle(hThread);
+                    suspendedThisProc.Add(pt.Id);
+                }
+            }
 
-                try { EmptyWorkingSet(item.proc.Handle); } catch { }
+            // Call NtResumeProcess in case it was fully suspended previously, just to be safe
+            try { NtResumeProcess(item.proc.Handle); } catch { }
+
+            // Throttle entire process CPU usage to IDLE
+            try { item.proc.PriorityClass = ProcessPriorityClass.Idle; } catch { }
+
+            try { EmptyWorkingSet(item.proc.Handle); } catch { }
+            
+            // Block network access via Windows Firewall
+            try
+            {
+                string exePath = item.proc.MainModule?.FileName ?? "";
+                if (!string.IsNullOrWhiteSpace(exePath))
+                {
+                    string ruleName = $"FocusMode_Block_{Path.GetFileName(exePath)}";
+                    Process.Start(new ProcessStartInfo("netsh", $"advfirewall firewall add rule name=\"{ruleName}\" dir=out action=block program=\"{exePath}\" enable=yes profile=any") { CreateNoWindow = true, UseShellExecute = false })?.WaitForExit();
+                    Process.Start(new ProcessStartInfo("netsh", $"advfirewall firewall add rule name=\"{ruleName}\" dir=in action=block program=\"{exePath}\" enable=yes profile=any") { CreateNoWindow = true, UseShellExecute = false })?.WaitForExit();
+                }
+            } catch { }
                 
                 session.SuspendedCount++;
                 if (item.backupObj != null)
@@ -468,6 +492,20 @@ public class ProcessManager
             
             // Resume fully suspended process just in case
             try { NtResumeProcess(proc.Handle); } catch { }
+
+            // Restore CPU Priority to Normal
+            try { proc.PriorityClass = ProcessPriorityClass.Normal; } catch { }
+
+            // Unblock Network Access
+            try
+            {
+                string exePath = proc.MainModule?.FileName ?? "";
+                if (!string.IsNullOrWhiteSpace(exePath))
+                {
+                    string ruleName = $"FocusMode_Block_{Path.GetFileName(exePath)}";
+                    Process.Start(new ProcessStartInfo("netsh", $"advfirewall firewall delete rule name=\"{ruleName}\"") { CreateNoWindow = true, UseShellExecute = false })?.WaitForExit();
+                }
+            } catch { }
 
             // Resume suspended threads
             foreach (var threadId in suspendedThreadIds)
